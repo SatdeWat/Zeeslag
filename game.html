@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zeeslag Game</title>
+<style>
+body{font-family:sans-serif;text-align:center;background:#0b3d91;color:white;margin:0;}
+h2{margin:10px;}
+.grid{display:grid;grid-template-columns:repeat(var(--size),40px);gap:2px;justify-content:center;margin:10px auto;}
+.cell{width:40px;height:40px;background:#4da6ff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.2em;}
+#boards{display:flex;justify-content:center;gap:50px;}
+#popup{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);
+background:red;color:white;padding:10px;border-radius:5px;display:none;}
+</style>
+</head>
+<body>
+<h2 id="turn">Wachten op tegenstander...</h2>
+<div id="boards">
+<div>
+<h3>Jouw Grid</h3>
+<div id="playerGrid" class="grid"></div>
+</div>
+<div>
+<h3>Tegenstander</h3>
+<div id="oppGrid" class="grid"></div>
+</div>
+</div>
+<div id="popup"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+// Firebase config
+const firebaseConfig = {apiKey:"APIKEY",authDomain:"PROJECT.firebaseapp.com",databaseURL:"https://PROJECT.firebaseio.com",projectId:"PROJECT",storageBucket:"PROJECT.appspot.com",messagingSenderId:"SENDERID",appId:"APPID"};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
+
+let player=localStorage.getItem('player'), lobby=localStorage.getItem('lobby'), mode=localStorage.getItem('mode');
+let playerGrid=[], oppGrid=[], gridSize=mode=='classic'?10:15;
+const shipsCount=mode=='classic'?3:4;
+
+function showPopup(msg){const p=document.getElementById('popup');p.innerText=msg;p.style.display='block';setTimeout(()=>p.style.display='none',3000);}
+
+// Setup grids
+const pContainer=document.getElementById('playerGrid'), oContainer=document.getElementById('oppGrid');
+pContainer.style.setProperty('--size',gridSize); oContainer.style.setProperty('--size',gridSize);
+for(let i=0;i<gridSize*gridSize;i++){pContainer.appendChild(document.createElement('div'));oContainer.appendChild(document.createElement('div'));}
+let turn=false;
+
+// Load grids
+db.ref('lobbies/'+lobby+'/player'+player+'/grid').on('value',snap=>{
+    playerGrid=snap.val(); updateGrid(pContainer,playerGrid,false);
+});
+const opp=player=='1'?'player2':'player1';
+db.ref('lobbies/'+lobby+'/'+opp+'/grid').on('value',snap=>{
+    if(!snap.exists())return;
+    oppGrid=snap.val(); updateGrid(oContainer,oppGrid,true);
+});
+function updateGrid(container,grid,isOpp){
+    for(let i=0;i<grid.length;i++){
+        const cell=container.children[i]; cell.innerText='';
+        if(grid[i]=='hit')cell.innerText='🔥';
+        else if(grid[i]=='miss')cell.innerText='🌊';
+        else if(grid[i]=='sunk')cell.innerText='💀';
+        else if(!isOpp && grid[i]==1)cell.style.background='#888';
+        else cell.style.background='#4da6ff';
+    }
+}
+
+// Click opp grid
+for(let i=0;i<gridSize*gridSize;i++){
+    oContainer.children[i].onclick=()=>{if(turn)fire(i);}
+}
+
+// Fire
+function fire(i){
+    if(oppGrid[i]=='hit'||oppGrid[i]=='miss'||oppGrid[i]=='sunk'){showPopup('Al geschoten');return;}
+    let hit=false;
+    if(oppGrid[i]==1){hit=true; oppGrid[i]='hit';}
+    else oppGrid[i]='miss';
+    db.ref('lobbies/'+lobby+'/'+opp+'/grid').set(oppGrid);
+    if(hit && mode=='streak')turn=true; else turn=!turn;
+}
+</script>
+</body>
+</html>
