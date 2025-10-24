@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zeeslag Lobby</title>
+<style>
+body {font-family:sans-serif;text-align:center;background:#0b3d91;color:white;}
+input, button, select {margin:5px;padding:10px;font-size:1em;}
+#popup {position:fixed;bottom:10px;left:50%;transform:translateX(-50%);
+background:red;color:white;padding:10px;border-radius:5px;display:none;}
+</style>
+</head>
+<body>
+<h1>Zeeslag Multiplayer</h1>
+<div id="deviceCheck"></div>
+<div id="login">
+<input id="username" placeholder="Gebruikersnaam">
+<input id="lobby" placeholder="Lobby code">
+<button onclick="login()">Join/Create Lobby</button>
+<br>
+<select id="mode">
+<option value="classic">Classic</option>
+<option value="streak">Streak</option>
+<option value="power">Power</option>
+</select>
+</div>
+<div id="popup"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+// Firebase config invullen
+const firebaseConfig = {
+apiKey:"APIKEY",authDomain:"PROJECT.firebaseapp.com",
+databaseURL:"https://PROJECT.firebaseio.com",
+projectId:"PROJECT",
+storageBucket:"PROJECT.appspot.com",
+messagingSenderId:"SENDERID",
+appId:"APPID"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// Laptop-only check
+if(/Mobi|Android/i.test(navigator.userAgent)){
+    document.getElementById('deviceCheck').innerHTML="<h2>Alleen laptop/PC ondersteund!</h2>";
+    document.getElementById('login').style.display='none';
+}
+
+function showPopup(msg){
+    const p=document.getElementById('popup');
+    p.innerText=msg; p.style.display='block';
+    setTimeout(()=>{p.style.display='none';},4000);
+}
+
+function login(){
+    const username=document.getElementById('username').value;
+    const lobby=document.getElementById('lobby').value;
+    const mode=document.getElementById('mode').value;
+    if(!username||!lobby){showPopup("Vul alles in!"); return;}
+    const ref=db.ref('lobbies/'+lobby);
+    ref.get().then(snap=>{
+        if(!snap.exists()){
+            ref.set({player1:{name:username},mode:mode});
+            localStorage.setItem('player','1'); localStorage.setItem('lobby',lobby);
+            localStorage.setItem('mode',mode);
+            window.location='setup.html';
+        }else{
+            if(snap.val().player2){showPopup("Lobby vol!"); return;}
+            ref.child('player2').set({name:username});
+            localStorage.setItem('player','2'); localStorage.setItem('lobby',lobby);
+            localStorage.setItem('mode',snap.val().mode);
+            window.location='setup.html';
+        }
+    });
+}
+</script>
+</body>
+</html>
