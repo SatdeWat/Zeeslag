@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zeeslag Setup</title>
+<style>
+body{font-family:sans-serif;text-align:center;background:#0b3d91;color:white;margin:0;}
+h2{margin-top:10px;}
+#popup{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);
+background:red;color:white;padding:10px;border-radius:5px;display:none;}
+.grid{display:grid;grid-template-columns:repeat(var(--size),40px);gap:2px;justify-content:center;margin:10px;}
+.cell{width:40px;height:40px;background:#4da6ff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.cell.ship{background:#888;}
+button{padding:10px;margin:5px;}
+</style>
+</head>
+<body>
+<h2>Plaats je schepen</h2>
+<div>
+<button onclick="rotateShip()">Draai (H/V)</button>
+<button onclick="ready()">Klaar</button>
+</div>
+<div id="playerGrid" class="grid"></div>
+<div id="popup"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+// Firebase config
+const firebaseConfig = {
+apiKey:"APIKEY",authDomain:"PROJECT.firebaseapp.com",
+databaseURL:"https://PROJECT.firebaseio.com",
+projectId:"PROJECT",
+storageBucket:"PROJECT.appspot.com",
+messagingSenderId:"SENDERID",
+appId:"APPID"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
+
+let player=localStorage.getItem('player'), lobby=localStorage.getItem('lobby'), mode=localStorage.getItem('mode');
+let gridSize=10, ships=[], orientation='H';
+if(mode=='classic'){gridSize=10; ships=[3,3,4];}
+if(mode=='streak'){gridSize=15; ships=[4,4,3,3];}
+if(mode=='power'){gridSize=15; ships=[4,4,3,3];}
+let playerGrid=[], currentShip=0;
+
+const container=document.getElementById('playerGrid');
+container.style.setProperty('--size',gridSize);
+for(let i=0;i<gridSize*gridSize;i++){
+    const cell=document.createElement('div');cell.className='cell';cell.dataset.index=i;
+    cell.onclick=()=>placeShip(i,cell);
+    container.appendChild(cell);playerGrid.push(0);
+}
+
+function rotateShip(){orientation=orientation=='H'?'V':'H';showPopup('Draai: '+orientation);}
+
+function showPopup(msg){const p=document.getElementById('popup');p.innerText=msg;p.style.display='block';setTimeout(()=>p.style.display='none',3000);}
+
+function placeShip(i,cell){
+    if(currentShip>=ships.length){showPopup('Alle schepen geplaatst!'); return;}
+    let size=ships[currentShip]; let indices=[];
+    for(let s=0;s<size;s++){
+        let idx = orientation=='H'?i+s:i+s*gridSize;
+        if(idx>=gridSize*gridSize || (orientation=='H' && Math.floor(idx/gridSize)!=Math.floor(i/gridSize))){showPopup('Kan hier niet plaatsen');return;}
+        if(playerGrid[idx]){showPopup('Vakje bezet');return;}
+        indices.push(idx);
+    }
+    indices.forEach(idx=>{playerGrid[idx]=1;container.children[idx].classList.add('ship');});
+    currentShip++;
+}
+
+function ready(){
+    if(currentShip<ships.length){showPopup('Plaats alle schepen!'); return;}
+    db.ref('lobbies/'+lobby+'/player'+player).set({grid:playerGrid});
+    const opp=player=='1'?'player2':'player1';
+    db.ref('lobbies/'+lobby+'/'+opp).on('value',snap=>{
+        if(snap.exists() && snap.val().grid){window.location='game.html';}
+    });
+}
+</script>
+</body>
+</html>
